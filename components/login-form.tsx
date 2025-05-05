@@ -46,53 +46,63 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm">{error}</div>}
+    <div className="w-full max-w-md mx-auto p-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-md text-sm">
+            {error}
+          </div>
+        )}
 
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="Enter your email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
+        <div className="space-y-2">
+          <Label htmlFor="email" className="text-gray-700 dark:text-gray-200">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={loading}
+            className="border-gray-300 dark:border-gray-600 focus:border-[#205375] dark:focus:border-[#40a9ff] focus:ring-[#205375] dark:focus:ring-[#40a9ff] bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password" className="text-gray-700 dark:text-gray-200">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            className="border-gray-300 dark:border-gray-600 focus:border-[#205375] dark:focus:border-[#40a9ff] focus:ring-[#205375] dark:focus:ring-[#40a9ff] bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+          />
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Checkbox id="remember" className="border-gray-300 dark:border-gray-600" />
+          <Label htmlFor="remember" className="text-sm font-normal cursor-pointer text-gray-700 dark:text-gray-200">
+            Remember me
+          </Label>
+        </div>
+
+        <Button 
+          type="submit" 
+          className="w-full bg-[#205375] dark:bg-[#40a9ff] hover:bg-[#112B3C] dark:hover:bg-[#1890ff] text-white" 
           disabled={loading}
-          className="border-gray-300 focus:border-[#205375] focus:ring-[#205375]"
-        />
-      </div>
+        >
+          {loading ? "Logging in..." : "Login"}
+        </Button>
 
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          placeholder="Enter your password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          disabled={loading}
-          className="border-gray-300 focus:border-[#205375] focus:ring-[#205375]"
-        />
-      </div>
-
-      <div className="flex items-center space-x-2">
-        <Checkbox id="remember" />
-        <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">
-          Remember me
-        </Label>
-      </div>
-
-      <Button type="submit" className="w-full bg-[#205375] hover:bg-[#112B3C] text-white" disabled={loading}>
-        {loading ? "Logging in..." : "Login"}
-      </Button>
-
-      <div className="text-center">
-        <a href="#" className="text-[#205375] text-sm hover:underline">
-          Forgot password?
-        </a>
-      </div>
-    </form>
+        <div className="text-center">
+          <a href="https://mpmmcc.tmc.gov.in/" className="text-[#205375] dark:text-[#40a9ff] text-sm hover:underline">
+            Forgot password?
+          </a>
+        </div>
+      </form>
+    </div>
   )
 }
