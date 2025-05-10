@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
@@ -167,53 +165,46 @@ export function TableEditor({ selectedTable }: TableEditorProps) {
     if (confirm("Are you sure you want to delete this record?")) {
       try {
         setLoading(true)
-        // Debug log to see the record data
-        console.log('Record to delete:', record);
-        console.log('Selected table:', selectedTable);
+        setError(null) // Clear any previous errors
         
         // Get the correct ID field based on the table name
         const idFieldMap: Record<string, string> = {
           'tenders': 'TenderID',
           'results': 'ResultID',
-          'medical_faculty': 'FacultyID',
+          'medical_faculty': 'PositionID', // Fixed: use PositionID
           'medical_residents': 'ResidentID',
           'nonmedical_contractual': 'ContractID',
           'nonmedical_permanent': 'PermanentID'
         };
         
         const idField = idFieldMap[selectedTable];
-        console.log('ID Field from map:', idField);
-        console.log('Available fields in record:', Object.keys(record));
-        
         if (!idField) {
           setError("Invalid table type");
           return;
         }
         
-        const id = record[idField];
-        console.log('ID value:', id);
-        
-        if (!id) {
-          setError("Invalid record ID");
+        // Get the ID value and ensure it's a number
+        const id = parseInt(record[idField]);
+        if (isNaN(id)) {
+          setError(`Invalid ID value for ${idField}`);
           return;
         }
 
-        const result = await deleteTableRecord(selectedTable, id)
-
+        console.log(`Attempting to delete record from ${selectedTable} with ${idField}=${id}`);
+        
+        const result = await deleteTableRecord(selectedTable, id);
+        
         if (result.success) {
           // Refresh the data after successful deletion
-          const refreshResult = await getTableData(selectedTable)
-          if (refreshResult.success) {
-            setData(refreshResult.data || [])
-          }
+          await fetchData(); // Use fetchData instead of direct getTableData call
         } else {
-          setError(result.error || "Failed to delete record")
+          setError(result.error || "Failed to delete record");
         }
-      } catch (err) {
-        console.error("Error deleting record:", err)
-        setError("An error occurred while deleting the record")
+      } catch (err: any) {
+        console.error("Error deleting record:", err);
+        setError(err.message || "An error occurred while deleting the record");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
   }
@@ -232,11 +223,12 @@ export function TableEditor({ selectedTable }: TableEditorProps) {
       },
       results: {
         Title: "",
-        Department: "",
         ReferenceNo: "",
-        ResultDate: "",
+        StartDate: "",
+        EndDate: "",
         DocumentPath: "",
-        CorrigendumPath: ""
+        Department: "",
+        ResultDate: ""
       },
       medical_faculty: {
         PositionName: "",
@@ -333,17 +325,38 @@ export function TableEditor({ selectedTable }: TableEditorProps) {
       if (formattedData.EndDate) {
         formattedData.EndDate = new Date(formattedData.EndDate).toISOString().split('T')[0]
       }
-      if (formattedData.ResultDate) {
-        formattedData.ResultDate = new Date(formattedData.ResultDate).toISOString().split('T')[0]
+
+      // For faculty, residents, and results tables, push 'false' for removed fields
+      if (selectedTable === 'medical_faculty' || 
+          selectedTable === 'medical_residents' || 
+          selectedTable === 'nonmedical_contractual' || 
+          selectedTable === 'nonmedical_permanent' ||
+          selectedTable === 'results') {
+        if (selectedTable === 'results') {
+          formattedData.Department = 'false'
+          // Set ResultDate to 1990-01-01 by default
+          formattedData.ResultDate = new Date('1990-01-01').toISOString().split('T')[0]
+        } else {
+          formattedData.Department = 'false'
+          formattedData.Venue = 'false'
+          formattedData.ContactNumber = 'false'
+          formattedData.CorrigendumPath = 'false'
+        }
       }
 
-      // Remove empty values
+      // Remove empty values for non-required fields
+      const requiredFields = formFields
+        .filter((field: any) => field.required)
+        .map((field: any) => field.name)
+
       Object.keys(formattedData).forEach(key => {
-        if (formattedData[key] === "" || formattedData[key] === null) {
+        if (!requiredFields.includes(key) &&
+            (formattedData[key] === "" || formattedData[key] === null || formattedData[key] === undefined)) {
           delete formattedData[key]
         }
       })
 
+      console.log('Sending data to server:', JSON.stringify(formattedData, null, 2))
       const result = await createTableRecord(selectedTable, formattedData)
 
       if (result.success) {
@@ -367,6 +380,15 @@ export function TableEditor({ selectedTable }: TableEditorProps) {
 
   const getTableColumns = () => {
     if (data.length === 0) return []
+    if (selectedTable === 'medical_faculty' || 
+        selectedTable === 'medical_residents' || 
+        selectedTable === 'nonmedical_contractual' || 
+        selectedTable === 'nonmedical_permanent' ||
+        selectedTable === 'results') {
+      return selectedTable === 'results' 
+        ? ['Title', 'ReferenceNo', 'StartDate', 'EndDate', 'DocumentPath']
+        : ['PositionName', 'ReferenceNo', 'StartDate', 'EndDate', 'DocumentPath']
+    }
     const record = data[0]
     const allColumns = Object.keys(record).filter(key => 
       !['CreatedAt', 'UpdatedAt', 'LastLogin'].includes(key)
@@ -404,56 +426,39 @@ export function TableEditor({ selectedTable }: TableEditorProps) {
         { name: "CorrigendumPath", label: "Corrigendum Document", type: "file", required: false, maxLength: 255 }
       ],
       results: [
-        { name: "Title", label: "Result Title", type: "text", required: true, placeholder: "Enter result title", maxLength: 500 },
-        { name: "Department", label: "Department", type: "text", required: true, placeholder: "Enter department name", maxLength: 200 },
-        { name: "ReferenceNo", label: "Reference No", type: "text", required: true, placeholder: "Enter reference number", maxLength: 50 },
-        { name: "ResultDate", label: "Result Date", type: "date", required: true },
-        { name: "DocumentPath", label: "Result Document", type: "file", required: true, maxLength: 500 },
-        { name: "CorrigendumPath", label: "Corrigendum Document", type: "file", required: false, maxLength: 500 }
+        { name: "Title", label: "Result Name", type: "text", required: true, placeholder: "Enter result name", maxLength: 500 },
+        { name: "ReferenceNo", label: "Advertisement No", type: "text", required: true, placeholder: "Enter advertisement number", maxLength: 50 },
+        { name: "StartDate", label: "Start Date", type: "date", required: true },
+        { name: "EndDate", label: "End Date", type: "date", required: true },
+        { name: "DocumentPath", label: "Result Document", type: "file", required: true, maxLength: 500 }
       ],
       medical_faculty: [
-        { name: "PositionName", label: "Position Name", type: "text", required: true, placeholder: "Enter position name", maxLength: 500 },
-        { name: "Department", label: "Department", type: "text", required: true, placeholder: "Enter department name", maxLength: 200 },
-        { name: "Venue", label: "Venue", type: "text", required: true, placeholder: "Enter venue details", maxLength: 500 },
-        { name: "ContactNumber", label: "Contact Number", type: "text", required: true, placeholder: "Enter contact number", maxLength: 20 },
-        { name: "ReferenceNo", label: "Reference No", type: "text", required: true, placeholder: "Enter reference number", maxLength: 50 },
+        { name: "PositionName", label: "Advertisement Name", type: "text", required: true, placeholder: "Enter advertisement name", maxLength: 500 },
+        { name: "ReferenceNo", label: "Advertisement No", type: "text", required: true, placeholder: "Enter advertisement number", maxLength: 50 },
         { name: "StartDate", label: "Start Date", type: "date", required: true },
         { name: "EndDate", label: "End Date", type: "date", required: true },
-        { name: "DocumentPath", label: "Advertisement Document", type: "file", required: true, maxLength: 500 },
-        { name: "CorrigendumPath", label: "Corrigendum Document", type: "file", required: false, maxLength: 500 }
+        { name: "DocumentPath", label: "Advertisement Document", type: "file", required: true, maxLength: 500 }
       ],
       medical_residents: [
-        { name: "PositionName", label: "Position Name", type: "text", required: true, placeholder: "Enter position name", maxLength: 500 },
-        { name: "Department", label: "Department", type: "text", required: true, placeholder: "Enter department name", maxLength: 200 },
-        { name: "Venue", label: "Venue", type: "text", required: true, placeholder: "Enter venue details", maxLength: 500 },
-        { name: "ContactNumber", label: "Contact Number", type: "text", required: true, placeholder: "Enter contact number", maxLength: 20 },
-        { name: "ReferenceNo", label: "Reference No", type: "text", required: true, placeholder: "Enter reference number", maxLength: 50 },
+        { name: "PositionName", label: "Advertisement Name", type: "text", required: true, placeholder: "Enter advertisement name", maxLength: 500 },
+        { name: "ReferenceNo", label: "Advertisement No", type: "text", required: true, placeholder: "Enter advertisement number", maxLength: 50 },
         { name: "StartDate", label: "Start Date", type: "date", required: true },
         { name: "EndDate", label: "End Date", type: "date", required: true },
-        { name: "DocumentPath", label: "Advertisement Document", type: "file", required: true, maxLength: 500 },
-        { name: "CorrigendumPath", label: "Corrigendum Document", type: "file", required: false, maxLength: 500 }
+        { name: "DocumentPath", label: "Advertisement Document", type: "file", required: true, maxLength: 500 }
       ],
       nonmedical_contractual: [
-        { name: "PositionName", label: "Position Name", type: "text", required: true, placeholder: "Enter position name", maxLength: 500 },
-        { name: "Department", label: "Department", type: "text", required: true, placeholder: "Enter department name", maxLength: 200 },
-        { name: "Venue", label: "Venue", type: "text", required: true, placeholder: "Enter venue details", maxLength: 500 },
-        { name: "ContactNumber", label: "Contact Number", type: "text", required: true, placeholder: "Enter contact number", maxLength: 20 },
-        { name: "ReferenceNo", label: "Reference No", type: "text", required: true, placeholder: "Enter reference number", maxLength: 50 },
+        { name: "PositionName", label: "Advertisement Name", type: "text", required: true, placeholder: "Enter advertisement name", maxLength: 500 },
+        { name: "ReferenceNo", label: "Advertisement No", type: "text", required: true, placeholder: "Enter advertisement number", maxLength: 50 },
         { name: "StartDate", label: "Start Date", type: "date", required: true },
         { name: "EndDate", label: "End Date", type: "date", required: true },
-        { name: "DocumentPath", label: "Advertisement Document", type: "file", required: true, maxLength: 500 },
-        { name: "CorrigendumPath", label: "Corrigendum Document", type: "file", required: false, maxLength: 500 }
+        { name: "DocumentPath", label: "Advertisement Document", type: "file", required: true, maxLength: 500 }
       ],
       nonmedical_permanent: [
-        { name: "PositionName", label: "Position Name", type: "text", required: true, placeholder: "Enter position name", maxLength: 500 },
-        { name: "Department", label: "Department", type: "text", required: true, placeholder: "Enter department name", maxLength: 200 },
-        { name: "Venue", label: "Venue", type: "text", required: true, placeholder: "Enter venue details", maxLength: 500 },
-        { name: "ContactNumber", label: "Contact Number", type: "text", required: true, placeholder: "Enter contact number", maxLength: 20 },
-        { name: "ReferenceNo", label: "Reference No", type: "text", required: true, placeholder: "Enter reference number", maxLength: 50 },
+        { name: "PositionName", label: "Advertisement Name", type: "text", required: true, placeholder: "Enter advertisement name", maxLength: 500 },
+        { name: "ReferenceNo", label: "Advertisement No", type: "text", required: true, placeholder: "Enter advertisement number", maxLength: 50 },
         { name: "StartDate", label: "Start Date", type: "date", required: true },
         { name: "EndDate", label: "End Date", type: "date", required: true },
-        { name: "DocumentPath", label: "Advertisement Document", type: "file", required: true, maxLength: 500 },
-        { name: "CorrigendumPath", label: "Corrigendum Document", type: "file", required: false, maxLength: 500 }
+        { name: "DocumentPath", label: "Advertisement Document", type: "file", required: true, maxLength: 500 }
       ]
     }
     return fields[selectedTable] || []
@@ -631,6 +636,7 @@ export function TableEditor({ selectedTable }: TableEditorProps) {
                             onFileSelect={handleNewFileSelect}
                             currentFilePath={newFormData.DocumentPath}
                             currentFileName={newFormData.FileName}
+                            directory={selectedTable === "tenders" ? "E:/mpmmcc.tmc.gov.in/mpmmcc/public/Tend" : undefined}
                           />
                           {newFormData.DocumentPath && (
                             <div className="text-xs text-gray-500">
@@ -644,6 +650,7 @@ export function TableEditor({ selectedTable }: TableEditorProps) {
                             onFileSelect={handleNewCorrigendumSelect}
                             currentFilePath={newFormData.CorrigendumPath}
                             currentFileName={newFormData.CorrigendumFileName}
+                            directory={selectedTable === "tenders" ? "E:/mpmmcc.tmc.gov.in/mpmmcc/public/Tend" : undefined}
                           />
                           {newFormData.CorrigendumPath && (
                             <div className="text-xs text-gray-500">
@@ -725,6 +732,7 @@ export function TableEditor({ selectedTable }: TableEditorProps) {
                                 onFileSelect={handleFileSelect}
                                 currentFilePath={editFormData.FilePath}
                                 currentFileName={editFormData.FileName}
+                                directory={selectedTable === "tenders" ? "E:/mpmmcc.tmc.gov.in/mpmmcc/public/Tend" : undefined}
                               />
                             ) : column === "DocumentPath" || column === "CorrigendumPath" ? (
                               <div key={`file-container-${rowId}-${column}`} className="flex items-center gap-2">
@@ -776,7 +784,20 @@ export function TableEditor({ selectedTable }: TableEditorProps) {
                             </div>
                           ) : column.includes("Date") ? (
                             <span key={`date-display-${rowId}-${column}`}>
-                              {record[column] ? new Date(record[column]).toLocaleDateString() : "-"}
+                              {(() => {
+                                // Debug log for date value
+                                console.log(`Row ${rowId}, Column ${column}:`, record[column]);
+                                const value = record[column];
+                                if (!value || value === "1900-01-01" || value === "0000-00-00") {
+                                  return "-";
+                                }
+                                // Check if it's a valid date
+                                const dateObj = new Date(value);
+                                if (isNaN(dateObj.getTime())) {
+                                  return "-";
+                                }
+                                return dateObj.toLocaleDateString();
+                              })()}
                             </span>
                           ) : (
                             <span key={`text-display-${rowId}-${column}`}>

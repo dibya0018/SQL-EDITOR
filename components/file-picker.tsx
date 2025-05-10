@@ -2,86 +2,43 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
-import { Button } from "@/components/ui/button"
+import { useState } from "react"
 import { Input } from "@/components/ui/input"
-import { FileText, Upload, X } from "lucide-react"
+import { FileText } from "lucide-react"
 
 interface FilePickerProps {
   onFileSelect: (filePath: string, fileName: string) => void
   currentFilePath?: string
   currentFileName?: string
+  directory?: string
 }
 
-export function FilePicker({ onFileSelect, currentFilePath, currentFileName }: FilePickerProps) {
-  const [fileName, setFileName] = useState(currentFileName || "")
-  const [filePath, setFilePath] = useState(currentFilePath || "")
+export function FilePicker({ onFileSelect, currentFilePath, currentFileName, directory }: FilePickerProps) {
+  const [inputValue, setInputValue] = useState(currentFilePath || "")
   const [error, setError] = useState("")
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    // Check if file is a PDF
-    if (file.type !== "application/pdf") {
-      setError("Only PDF files are allowed")
+  const handleBlur = () => {
+    if (inputValue.trim() === "") {
+      onFileSelect("", "")
       return
     }
-
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError("File size must be less than 5MB")
-      return
-    }
-
-    setError("")
-    const folder = "uploads/docs/";
-    setFileName(file.name)
-    setFilePath(folder)
-    onFileSelect(folder, file.name)
-  }
-
-  const clearFile = () => {
-    setFileName("")
-    setFilePath("")
-    onFileSelect("", "")
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
+    // Assume the input is a full file path (e.g. E:/mpmmcc.tmc.gov.in/mpmmcc/public/Tend/example.pdf)
+    const folder = directory || "uploads/docs/"
+    const fileName = inputValue.split(/[\\/]/).pop() || ""
+    onFileSelect(folder, fileName)
   }
 
   return (
     <div className="space-y-2">
-      {filePath ? (
-        <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50">
-          <FileText className="h-5 w-5 text-[#205375]" />
-          <span className="flex-1 truncate text-sm">{fileName}</span>
-          <Button variant="ghost" size="sm" onClick={clearFile} className="h-8 w-8 p-0">
-            <X className="h-4 w-4" />
-            <span className="sr-only">Remove file</span>
-          </Button>
-        </div>
-      ) : (
-        <div className="flex gap-2">
-          <Input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf"
-            onChange={handleFileChange}
-            className="flex-1"
-          />
-          <Button
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            className="whitespace-nowrap"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Select PDF
-          </Button>
-        </div>
-      )}
-
+      <label className="text-sm font-medium text-gray-700">File Path (PDF)</label>
+      <Input
+        type="text"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onBlur={handleBlur}
+        placeholder="Enter (or paste) your PDF file path (e.g. /Results/example.pdf)"
+        className="w-full"
+      />
       {error && <p className="text-sm text-red-500">{error}</p>}
     </div>
   )

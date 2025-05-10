@@ -12,7 +12,7 @@ export function LoginHeader() {
     <header className="w-full bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center">
             <Image
               src="/logo-hbch-mpmmcc.png"
               alt="Homi Bhabha Cancer Hospital & MPMMCC Logo"
@@ -21,14 +21,6 @@ export function LoginHeader() {
               width={240}
               priority
             />
-            <div className="hidden md:block">
-              <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-                
-              </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                
-              </p>
-            </div>
           </div>
           
           <Button

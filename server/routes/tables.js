@@ -15,8 +15,28 @@ router.get('/:tableName', async (req, res) => {
     pool = await getConnection();
     console.log('[GET] Database connection established');
     
-    // Execute query
-    const query = `SELECT * FROM ${tableName} ORDER BY CreatedAt DESC`;
+    // Get table structure to identify date columns
+    const tableInfo = await pool.request().query(`
+      SELECT COLUMN_NAME, DATA_TYPE
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = '${tableName}'
+    `);
+    
+    // Find date columns
+    const dateColumns = tableInfo.recordset
+      .filter(col => col.DATA_TYPE === 'date' || col.DATA_TYPE === 'datetime')
+      .map(col => col.COLUMN_NAME);
+    
+    // Build the SELECT statement with CONVERT for date columns
+    const selectColumns = tableInfo.recordset.map(col => {
+      if (dateColumns.includes(col.COLUMN_NAME)) {
+        return `CONVERT(varchar, ${col.COLUMN_NAME}, 23) as ${col.COLUMN_NAME}`;
+      }
+      return col.COLUMN_NAME;
+    }).join(', ');
+    
+    // Execute query with formatted date columns
+    const query = `SELECT ${selectColumns} FROM ${tableName} ORDER BY CreatedAt DESC`;
     console.log('[GET] Executing query:', query);
     
     const result = await pool.request().query(query);
